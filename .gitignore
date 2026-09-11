@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.vsix
+code-insight-report*.json
+.code-insight/
+Code-Insight-Report*.json
+Code-Insight-Report*.xlsx

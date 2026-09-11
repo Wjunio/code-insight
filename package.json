@@ -1,0 +1,118 @@
+{
+  "name": "code-insight",
+  "displayName": "Code Insight",
+  "description": "Track Angular structural migration and configurable UI migration in HTML and Angular templates. Export Excel and JSON reports.",
+  "version": "0.0.3",
+  "private": true,
+  "license": "MIT",
+  "author": "Welington Junio Rezende Mateus",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Wjunio/code-insight.git"
+  },
+  "homepage": "https://github.com/Wjunio/code-insight#readme",
+  "bugs": {
+    "url": "https://github.com/Wjunio/code-insight/issues"
+  },
+  "engines": {
+    "vscode": "^1.96.0",
+    "node": ">=20"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "angular",
+    "standalone",
+    "migration",
+    "analysis"
+  ],
+  "main": "./dist/src/extension.js",
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    },
+    "virtualWorkspaces": {
+      "supported": true
+    }
+  },
+  "contributes": {
+    "jsonValidation": [
+      {
+        "fileMatch": ".code-insight.json",
+        "url": "./schemas/code-insight.schema.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "codeInsight.analyzeProject",
+        "title": "Analyze Project — Complete (Angular only)",
+        "category": "Code Insight"
+      },
+      {
+        "command": "codeInsight.analyzeStructural",
+        "title": "Structural Migration (Angular only)",
+        "category": "Code Insight"
+      },
+      {
+        "command": "codeInsight.analyzeUi",
+        "title": "UI Migration (HTML / Angular templates)",
+        "category": "Code Insight"
+      },
+      {
+        "command": "codeInsight.exportReport",
+        "title": "Export Report",
+        "category": "Code Insight"
+      },
+      {
+        "command": "codeInsight.exportJsonReport",
+        "title": "Export JSON Report",
+        "category": "Code Insight"
+      }
+    ],
+    "configuration": {
+      "title": "Code Insight",
+      "properties": {
+        "codeInsight.componentMappings": {
+          "type": "object",
+          "default": {},
+          "scope": "resource",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Legacy element mappings used only when .code-insight.json is absent. Configure migrationRules in that file for element, class, attribute and attribute-value rules."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit -p .",
+    "package": "vsce package",
+    "package:patch": "npm version patch --no-git-tag-version && npm run package",
+    "compile": "tsc -p .",
+    "watch": "tsc -watch -p .",
+    "lint": "eslint src test",
+    "test": "npm run compile && node --test dist/test/*.test.js",
+    "check": "npm run lint && npm test",
+    "vscode:prepublish": "npm run check"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "~1.96.0",
+    "@vscode/vsce": "^3.9.2",
+    "eslint": "^10.0.0",
+    "typescript-eslint": "^8.0.0",
+    "typescript": "~5.9.3"
+  }
+}

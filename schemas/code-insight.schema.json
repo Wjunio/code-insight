@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Code Insight — Migration Rules",
+  "type": "object",
+  "required": ["migrationRules"],
+  "properties": {
+    "migrationRules": {
+      "type": "array",
+      "description": "Regras definidas pelo usuário. Substituem componentMappings quando este arquivo existe.",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "source", "target"],
+        "properties": {
+          "id": { "type": "string", "pattern": "\\S", "description": "Identificador único da regra." },
+          "type": { "enum": ["element", "class", "attribute", "attribute-value"] },
+          "source": { "type": "string", "pattern": "\\S", "description": "Tag, classe, atributo ou valor a procurar." },
+          "target": { "type": "string", "pattern": "\\S", "description": "Padrão de destino definido pelo usuário. Ocorrências encontradas contam como migradas; targetType define como procurar." },
+          "enabled": { "type": "boolean", "default": true },
+          "priority": { "type": "number", "default": 0, "description": "Maior número vence entre regras sobrepostas." },
+          "element": { "type": "string", "pattern": "^[a-zA-Z][\\w:.-]*$", "description": "Restringe a origem a esta tag, por exemplo input + matInput." },
+          "targetType": { "enum": ["element", "class", "attribute", "attribute-value"], "description": "Tipo de identificação do destino. Padrão: mesmo type da origem." },
+          "targetAttribute": { "type": "string", "pattern": "^[^\\s<>=\"']+$", "description": "Atributo para destino attribute-value; padrão: attribute da origem." },
+          "attribute": { "type": "string", "pattern": "^[^\\s<>=\"']+$", "description": "Nome do atributo para regras attribute-value." }
+        },
+        "allOf": [
+          { "if": { "required": ["targetType"], "properties": { "targetType": { "const": "attribute-value" }, "type": { "not": { "const": "attribute-value" } } } }, "then": { "required": ["targetAttribute"] } },
+          { "if": { "properties": { "type": { "const": "attribute-value" } } }, "then": { "required": ["attribute"] } },
+          { "if": { "properties": { "type": { "const": "element" } } }, "then": { "properties": { "source": { "pattern": "^[a-zA-Z][\\w:.-]*$" } } } },
+          { "if": { "properties": { "type": { "const": "class" } } }, "then": { "properties": { "source": { "pattern": "^\\S+$" } } } },
+          { "if": { "properties": { "type": { "const": "attribute" } } }, "then": { "properties": { "source": { "pattern": "^[^\\s<>=\"']+$" } } } }
+        ]
+      }
+    }
+  }
+}

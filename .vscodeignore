@@ -1,0 +1,16 @@
+.git/**
+.vscode/**
+src/**
+test/**
+dist/test/**
+**/*.map
+tsconfig.json
+eslint.config.mjs
+.github/**
+examples/*.xlsx
+.vscode-test/**
+.gitignore
+eslint.config.*
+.eslintrc*
+*.ts
+coverage/**

@@ -1,0 +1,9 @@
+{
+  "migrationRules": [
+    { "id": "input", "type": "element", "source": "input", "target": "meu-input", "enabled": true },
+    { "id": "material-icon", "type": "class", "source": "material-icon", "target": "sisbr-icon", "enabled": true },
+    { "id": "mat-icon", "type": "element", "source": "mat-icon", "target": "sisbr-icon", "enabled": true },
+    { "id": "mat-input", "type": "attribute", "source": "matInput", "target": "outro-input", "targetType": "element", "enabled": true },
+    { "id": "legacy-icon", "type": "attribute-value", "attribute": "data-component", "source": "legacy-icon", "target": "componente-x", "enabled": true }
+  ]
+}
