@@ -1,8 +1,9 @@
 {
-  "name": "code-insight",
+  "name": "arteprime-code-insight",
   "displayName": "Code Insight",
   "description": "Track Angular structural migration and configurable UI migration in HTML and Angular templates. Export Excel and JSON reports.",
-  "version": "0.0.3",
+  "version": "0.0.9",
+  "icon": "images/icon.png",
   "private": true,
   "license": "MIT",
   "author": "Welington Junio Rezende Mateus",
@@ -18,6 +19,7 @@
     "vscode": "^1.96.0",
     "node": ">=20"
   },
+  "publisher": "ArtePrime",
   "categories": [
     "Other"
   ],
