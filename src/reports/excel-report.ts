@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import type { AnalysisReport } from './report-types';
+import { flattenRoutes } from '../routes/route-types';
 
 type Value = string | number;
 const navy = 'FF17324D';
@@ -48,9 +49,20 @@ export async function excelReport(report: AnalysisReport): Promise<Uint8Array> {
   book.creator = 'Code Insight'; book.created = new Date(report.analyzedAt);
   const a = report.structural?.angular;
   const rules = report.ui?.migrationRules ?? [];
+  if (report.routes) {
+    const nodes = flattenRoutes(report.routes.tree);
+    const byId = new Map(nodes.map(n => [n.id, n]));
+    table(book, 'Rotas', ['Full Path', 'Path', 'Type', 'Component', 'Component File', 'Route File', 'Lazy', 'Title', 'Description', 'Guards', 'Redirect', 'Parent Route', 'Line', 'Column', 'Status', 'Route ID', 'Metadata'],
+      nodes.map(n => [n.fullPath ?? 'unknown', n.path ?? 'unknown', n.type, n.componentName ?? '', n.componentFile ?? '', n.routeFile,
+        n.lazy ? 'Sim' : 'Não', typeof n.title === 'string' ? n.title : JSON.stringify(n.title) ?? '',
+        typeof n.description === 'string' ? n.description : JSON.stringify(n.description) ?? '', JSON.stringify(n.guards),
+        JSON.stringify(n.redirectTo) ?? '', n.parentId ? byId.get(n.parentId)?.fullPath ?? 'unknown' : '', n.sourceLocation.line, n.sourceLocation.column,
+        n.status, n.id, JSON.stringify(n.data) ?? '']),
+      'Mapa estrutural de rotas Angular. Não determina itens de menu. unknown indica valor não resolvido estaticamente.');
+  }
   const summary = table(book, 'Resumo', ['Indicador', 'Valor'], [
     ['Projeto', report.projectName], ['Data da análise (UTC)', report.analyzedAt],
-    ['Fluxo', { complete: 'Completo — Angular', structural: 'Estrutural — Angular', ui: 'UI — HTML / templates Angular' }[report.mode]],
+    ['Fluxo', { routes: 'Angular Route Analysis', complete: 'Completo — Angular', structural: 'Estrutural — Angular', ui: 'UI — HTML / templates Angular' }[report.mode]],
     ['Progresso estrutural', a ? a.migrationPercentage / 100 : 'Não analisado'],
     ['Componentes encontrados', a?.totalComponents ?? 'Não analisado'],
     ['Standalone', a?.standaloneComponents ?? 'Não analisado'],
@@ -60,13 +72,14 @@ export async function excelReport(report: AnalysisReport): Promise<Uint8Array> {
     ['Templates UI analisados', report.ui?.analyzedTemplates ?? 'Não analisado'],
     ['Regras UI analisadas', report.ui ? rules.length : 'Não analisado'],
     ['Ocorrências UI', report.ui?.totalOccurrences ?? 'Não analisado'],
-    ['Avisos', (report.structural?.warnings.length ?? 0) + (report.ui?.warnings.length ?? 0)],
+    ['Avisos', (report.structural?.warnings.length ?? 0) + (report.ui?.warnings.length ?? 0) + (report.routes?.warnings.length ?? 0)],
     ['ID da análise', report.analysisId], ['ID do projeto', report.projectId], ['Schema JSON', report.schemaVersion],
     ['Progresso UI', report.ui ? report.ui.progressPercentage / 100 : 'Não analisado'],
-    ['Progresso geral', report.overallPercentage / 100],
+    ['Progresso geral', report.mode === 'routes' ? 'Não analisado' : report.overallPercentage / 100],
     ['UI migradas (destinos encontrados)', report.ui?.resolvedOccurrences ?? 'Não analisado'],
     ['UI restantes', report.ui?.remainingOccurrences ?? 'Não analisado'],
-    ['Componentes declarados em NgModules', a?.declaredModuleComponents ?? 'Não analisado']
+    ['Componentes declarados em NgModules', a?.declaredModuleComponents ?? 'Não analisado'],
+    ...(report.routes ? [['Rotas encontradas', report.routes.totalRoutes], ['Componentes de rotas resolvidos', report.routes.resolvedComponents], ['Rotas lazy', report.routes.lazyRoutes], ['Redirects', report.routes.redirectRoutes]] as Value[][] : [])
   ], 'UI é proporção de destinos encontrados, não comprovação histórica. Geral pondera componentes e ocorrências dos fluxos executados.');
   if (a) {
     summary.getCell('B7').numFmt = '0.00%';
@@ -103,7 +116,7 @@ export async function excelReport(report: AnalysisReport): Promise<Uint8Array> {
     rules.flatMap(r => r.matches.map(m => [m.ruleId, m.type, m.attribute ?? '', m.source, m.target, m.file, m.line, m.column, m.status === 'migrated' ? 'Migrado' : 'Pendente'])),
     report.ui ? 'Posições começam em 1 e apontam ao início da tag. Templates inline apontam para o TypeScript original.' : 'Análise UI não executada neste fluxo.');
   table(book, 'Avisos', ['Área', 'Mensagem'], [
-    ...(structural?.warnings.map(w => ['Estrutural', w]) ?? []), ...(report.ui?.warnings.map(w => ['UI', w]) ?? [])
+    ...(structural?.warnings.map(w => ['Estrutural', w]) ?? []), ...(report.ui?.warnings.map(w => ['UI', w]) ?? []), ...(report.routes?.warnings.map(w => ['Rotas', w]) ?? [])
   ], 'Avisos podem indicar resultados parciais. A ausência de avisos não elimina as limitações da análise estática.');
   const snapshots = [...(report.history ?? []).filter(s => s.projectId === report.projectId && s.analysisId !== report.analysisId), {
     analysisId: report.analysisId, projectId: report.projectId, analyzedAt: report.analyzedAt, mode: report.mode,

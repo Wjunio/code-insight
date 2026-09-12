@@ -4,7 +4,7 @@ import { isInAnalysisScope } from './file-scope';
 
 export async function readWorkspace(folder: vscode.WorkspaceFolder, token: vscode.CancellationToken): Promise<SourceFile[]> {
   const uris = await vscode.workspace.findFiles(
-    new vscode.RelativePattern(folder, '**/{*.ts,*.html,*.tsx,*.jsx,*.vue,*.svelte,package.json,angular.json}'),
+    new vscode.RelativePattern(folder, '**/{*.ts,*.html,*.tsx,*.jsx,*.vue,*.svelte,package.json,angular.json,tsconfig*.json}'),
     '**/{node_modules,dist,out,build,coverage,.git,.vscode,.angular,.code-insight}/**', undefined, token);
   const files: SourceFile[] = [];
   let bytes = 0;

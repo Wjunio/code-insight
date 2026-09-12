@@ -107,6 +107,15 @@ test('comandos: workspace ausente, não Angular, análise real, exportação e e
     const ui = handlers.get('codeInsight.analyzeUi');
     assert.ok(structural); assert.ok(ui);
     await structural(); await exportReport(); assert.equal(JSON.parse(written).ui, null);
+    const routes = handlers.get('codeInsight.analyzeRoutes');
+    assert.ok(routes);
+    sources['navigation.ts'] = "import {Routes} from '@angular/router'; const config:Routes=[{path:'saved',redirectTo:''}];";
+    documents.push({ uri: uri('/fixture/navigation.ts'), getText: () => "import {Routes} from '@angular/router'; const config:Routes=[{path:'unsaved',redirectTo:''}];" });
+    await routes(); await exportReport();
+    assert.equal(JSON.parse(written).routes.tree[0].path, 'unsaved');
+    assert.equal(JSON.parse(written).schemaVersion, 4);
+    assert.match(output.join('\n'), /ANGULAR ROUTE MAP/);
+    documents.length = 0;
     sources['.code-insight.json'] = '{"migrationRules":[]}';
     await analyze(); await exportReport(); assert.deepEqual(JSON.parse(written).ui.migrationRules, []);
     saveCancelled = true; written = ''; await exportReport(); assert.equal(written, '');

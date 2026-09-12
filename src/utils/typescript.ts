@@ -1,8 +1,9 @@
 import ts from 'typescript';
-import { posix } from 'node:path';
+import { createModuleResolver } from './module-resolution';
 import type { SourceFile } from '../reports/report-types';
 
-export function createProgram(files: SourceFile[]): ts.Program {
+export function createProgram(files: SourceFile[], usePaths = false): ts.Program {
+  const resolve = createModuleResolver(files, usePaths);
   const sources = new Map(files.filter(f => f.path.endsWith('.ts')).map(f => [
     `/project/${f.path}`, ts.createSourceFile(`/project/${f.path}`, f.content, ts.ScriptTarget.Latest, true)
   ]));
@@ -14,9 +15,7 @@ export function createProgram(files: SourceFile[]): ts.Program {
     useCaseSensitiveFileNames: () => true, getNewLine: () => '\n',
     fileExists: name => sources.has(name), readFile: name => sources.get(name)?.text,
     resolveModuleNames: (names, containingFile) => names.map(name => {
-      if (!name.startsWith('.')) return undefined;
-      const base = posix.resolve(posix.dirname(containingFile), name).replace(/\.js$/, '');
-      const file = [base, `${base}.ts`, `${base}/index.ts`].find(p => sources.has(p));
+      const file = resolve(name, containingFile);
       return file ? { resolvedFileName: file, extension: ts.Extension.Ts } : undefined;
     })
   };

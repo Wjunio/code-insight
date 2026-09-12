@@ -10,6 +10,7 @@ Identifica componentes Standalone, padrões antigos e destinos presentes no cód
 
 | Comando na paleta do VS Code | Quando usar | Resultado |
 | --- | --- | --- |
+| **Code Insight: Angular Route Analysis** | Mapear rotas Angular, componentes e arquivos relacionados. | Árvore de rotas, lazy loading, guards e metadados; exportação JSON/Excel. |
 | **Code Insight: Structural Migration (Angular only)** | Revisar NgModules e Standalone em Angular. | Somente métricas e avisos estruturais. Não lê regras de UI. |
 | **Code Insight: UI Migration (HTML / Angular templates)** | Procurar padrões de interface, inclusive sem Angular. | Regras e ocorrências em HTML e templates Angular. |
 | **Code Insight: Analyze Project — Complete (Angular only)** | Obter as duas análises para Angular. | Seções estrutural e UI separadas no mesmo relatório. |
@@ -22,7 +23,8 @@ O comando `codeInsight.analyzeProject` executa o fluxo completo. Os fluxos estru
 
 ## Funcionalidades
 
-- Três fluxos de análise, com progresso e cancelamento.
+- Quatro fluxos de análise, com progresso e cancelamento.
+- Mapa de rotas Angular por AST, incluindo `routing.ts` com extensões de menu, `loadChildren` para rotas ou módulos e relação componente → rotas. Veja o [guia de Angular Route Analysis](docs/ANGULAR-ROUTE-ANALYSIS.md).
 - Detecção por `package.json`, `angular.json` ou decorators importados de `@angular/core`.
 - Standalone explícito e defaults por versão: antes do Angular 19, `false`; a partir do 19, `true`.
 - Inventário de NgModules e componentes associados por símbolos, incluindo imports relativos, aliases, barrels e arrays simples.
@@ -38,7 +40,7 @@ Para usar a extensão, você precisa do VS Code 1.96+ para desktop ou com host r
 
 1. Abra no VS Code a pasta do projeto que deseja analisar.
 2. Para analisar UI, crie `.code-insight.json` nessa pasta com suas [regras de migração](#configuração-de-regras).
-3. Abra a paleta de comandos (`Ctrl+Shift+P`) e escolha um dos [três fluxos de análise](#escolha-o-fluxo-de-análise).
+3. Abra a paleta de comandos (`Ctrl+Shift+P`) e escolha um dos [quatro fluxos de análise](#escolha-o-fluxo-de-análise).
 4. Confira o resultado em **Output / Saída → Code Insight**, incluindo os avisos.
 5. Execute **Code Insight: Export Report**, escolha Excel ou JSON e selecione onde salvar.
 
@@ -217,7 +219,7 @@ Progresso geral: 61.6% (ponderado por componentes e ocorrências dos fluxos exec
 
 ## Como interpretar o relatório
 
-Os comandos exportam **schemaVersion 3**, com `mode` (`structural`, `ui` ou `complete`) e duas seções independentes:
+Os comandos de migração exportam **schemaVersion 3**, com `mode` (`structural`, `ui` ou `complete`) e duas seções independentes. **Angular Route Analysis** exporta schema 4, `mode: routes` e a seção `routes`; veja [modelo e compatibilidade](docs/ANGULAR-ROUTE-ANALYSIS.md#relatório-e-contagens).
 
 - `structural`: análise Angular, ou `null` quando não executada. Métricas em `structural.angular`, detalhes em `structural.components` e `structural.modules`, avisos em `structural.warnings`.
 - `ui`: análise de interface, ou `null` quando não executada. Contém `supportedFormats`, `analyzedTemplates`, `totalRules`, `migrationRules`, `totalOccurrences`, `resolvedOccurrences`, `remainingOccurrences`, `progressPercentage`, `files` (métricas por arquivo/regra) e `warnings`.
@@ -321,7 +323,7 @@ Uma lista `warnings` vazia não elimina as limitações descritas mais abaixo. J
 
 | Campo no JSON | Significado |
 | --- | --- |
-| `schemaVersion` | Versão do documento exportado; atualmente `3`. A seção estrutural preserva internamente o formato `1`. |
+| `schemaVersion` | `3` nos fluxos de migração; `4` no fluxo de rotas. A seção estrutural preserva internamente o formato `1`. |
 | `analysisId` | Identificador único desta execução. |
 | `projectId` | Identificador derivado da URI da pasta, útil para agrupar execuções na mesma localização. |
 | `projectName` | Nome da pasta selecionada no workspace. |
@@ -347,6 +349,7 @@ O Excel é um `.xlsx` real, gerado com ExcelJS em uma worker. Possui títulos, l
 | Ocorrências | Cada ocorrência e seu status Pendente/Migrado, com arquivo, linha e coluna. |
 | Avisos | Situações que podem tornar o resultado parcial. |
 | Histórico | Execução atual e snapshots anteriores recebidos pelo exportador. |
+| Rotas | Presente no fluxo Angular Route Analysis: árvore expandida com caminhos, componentes, arquivos, guards, redirects e localização. |
 
 Sem análise estrutural/UI, os indicadores correspondentes mostram “Não executado” ou “Não analisado”; abas detalhadas permanecem com cabeçalhos e explicação. Zero ocorrências é diferente de um fluxo não executado. Não há importação ou persistência automática de histórico nesta fase. O campo opcional `history` do modelo aceita snapshots com projeto, ID, data, fluxo e percentuais; o Excel inclui apenas snapshots do mesmo projeto e a execução atual. Para preservar análises manualmente, salve arquivos com nomes diferentes.
 
@@ -387,7 +390,8 @@ src/
     angular/         Detecção, componentes, módulos e standalone
     rules/           Tipos, configuração, scanner e registro de matchers
   ui-migration/      Analisador UI e adaptadores HTML/Angular independentes
-  commands/          Três fluxos de análise, VS Code e exportação
+  routes/            Descoberta AST, resolução e árvore de rotas Angular
+  commands/          Quatro fluxos de análise, VS Code e exportação
   reports/           Tipos, métricas e renderização texto/JSON/Excel
   export/            Contrato ReportExporter e implementações JSON/Excel
   utils/             AST, leitura assíncrona e controle da worker
@@ -407,7 +411,7 @@ Leitura em lotes de 16 arquivos; análise em worker thread. Cancelar encerra a w
 ## Limitações
 
 - Exclui `node_modules`, `dist`, `out`, `build`, `coverage`, `.git`, `.vscode`, `.angular`, `.code-insight`, `.d.ts`, `.spec.ts` e `.test.ts`. Analisa a pasta, não o grafo de um tsconfig. A política de exclusão está isolada para configuração futura.
-- Não resolve `paths` de tsconfig, wrappers/reexports de decorators, chamadas arbitrárias, metadados indiretos ou templates calculados. Casos dinâmicos reconhecidos geram avisos; decorators ocultos por wrappers podem não ser detectados.
+- Os fluxos estrutural/UI não resolvem `paths` de tsconfig; o fluxo de rotas suporta aliases simples conforme seu guia. Não resolve wrappers/reexports de decorators, chamadas arbitrárias ou templates calculados. Casos dinâmicos reconhecidos geram avisos; decorators ocultos por wrappers podem não ser detectados.
 - Versão vem do `package.json` mais próximo que declara `@angular/core`. Versões simples, `^` e `~` com major conhecido são aceitas; intervalos amplos/tags são inconclusivos. Não consulta lockfile/instalação efetiva: verifique a correspondência com a versão usada pelo projeto.
 - Scanner HTML é lexical, não o compilador Angular. Sintaxe malformada/construções dinâmicas complexas podem gerar contagens incompletas.
 - Erros sintáticos, declarações não resolvidas e templates ausentes geram avisos. A análise não prova que o projeto compila ou que a migração está correta.

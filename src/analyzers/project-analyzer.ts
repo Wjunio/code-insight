@@ -7,7 +7,7 @@ import { analyzeModule } from './angular/module-analyzer';
 import { detectProject, versionFor } from './angular/project-detector';
 import { analyzeRules } from './rules/migration-rules';
 
-export interface ProjectAnalyzer { analyze(input: AnalysisInput): ProjectReport | null }
+export interface ProjectAnalyzer<T = ProjectReport> { analyze(input: AnalysisInput): T | null }
 export class AngularProjectAnalyzer implements ProjectAnalyzer {
   analyze(input: AnalysisInput): ProjectReport | null {
     const warnings: string[] = [];

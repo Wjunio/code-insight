@@ -1,7 +1,23 @@
 import type { AnalysisReport, ProjectReport } from './report-types';
+import { flattenRoutes } from '../routes/route-types';
 
 export function reportJson(report: ProjectReport | AnalysisReport): string { return JSON.stringify(report, null, 2) + '\n'; }
 export function analysisReportText(report: AnalysisReport): string {
+  if (report.routes) {
+    const r = report.routes;
+    const depths = new Map<string, number>();
+    return ['CODE INSIGHT', `Projeto: ${report.projectName}`, `Analisado em: ${report.analyzedAt}`,
+      'Fluxo: Angular Route Analysis', '', 'ANGULAR ROUTE MAP',
+      `Routes found: ${r.totalRoutes}`, `Components resolved: ${r.resolvedComponents}`,
+      `Lazy routes: ${r.lazyRoutes}`, `Redirects: ${r.redirectRoutes}`, `Warnings: ${r.warnings.length}`, '',
+      ...flattenRoutes(r.tree).map(n => {
+        const depth = n.parentId ? (depths.get(n.parentId) ?? 0) + 1 : 0;
+        depths.set(n.id, depth);
+        return `${'  '.repeat(depth)}${n.path === '' ? '(empty)' : n.path ?? '(unknown)'} [${n.type}] ${n.fullPath ?? 'unknown'}\n${'  '.repeat(depth + 1)}${n.routeFile}:${n.sourceLocation.line}:${n.sourceLocation.column}${n.componentName ? ` → ${n.componentName} (${n.componentFile ?? 'unknown'})` : ''}${n.type === 'redirect' ? ` → ${JSON.stringify(n.redirectTo)}` : ''}`;
+      }), ...r.warnings.map(w => `Aviso de rotas: ${w}`), '',
+      'Route Map representa rotas, não um menu de navegação.',
+      'Exporte com Code Insight: Export Report (Excel ou JSON).'].join('\n');
+  }
   const lines = ['CODE INSIGHT', `Projeto: ${report.projectName}`, `Analisado em: ${report.analyzedAt}`,
     `Fluxo: ${report.mode === 'complete' ? 'Análise completa — exclusivo Angular' : report.mode === 'structural' ? 'Structural Migration — exclusivo Angular' : 'UI Migration — HTML e templates Angular'}`, ''];
   if (report.structural) {

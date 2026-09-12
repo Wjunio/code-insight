@@ -2,7 +2,7 @@ import type { MigrationOccurrence, MigrationRule, MigrationRuleType } from '../a
 
 export interface SourceFile { path: string; content: string }
 export interface AnalysisInput {
-  mode?: 'structural' | 'ui' | 'complete';
+  mode?: 'structural' | 'ui' | 'complete' | 'routes';
   projectName: string;
   projectId: string;
   files: SourceFile[];
@@ -10,7 +10,8 @@ export interface AnalysisInput {
   migrationRules?: MigrationRule[];
 }
 export interface AnalysisReport {
-  schemaVersion: 3;
+  schemaVersion: 3 | 4;
+  routes?: import('../routes/route-types').RouteMapReport;
   warnings: string[];
   history?: AnalysisSnapshot[];
   overallPercentage: number;
@@ -19,7 +20,7 @@ export interface AnalysisReport {
   projectName: string;
   analyzedAt: string;
   analyzedFiles: number;
-  mode: 'structural' | 'ui' | 'complete';
+  mode: 'structural' | 'ui' | 'complete' | 'routes';
   structural: ProjectReport | null;
   ui: {
     supportedFormats: string[];
