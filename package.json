@@ -2,7 +2,7 @@
   "name": "arteprime-code-insight",
   "displayName": "Code Insight",
   "description": "Track Angular structural migration and configurable UI migration in HTML and Angular templates. Export Excel and JSON reports.",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "icon": "images/icon.png",
   "private": true,
   "license": "MIT",

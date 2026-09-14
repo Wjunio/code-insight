@@ -20,6 +20,41 @@ function analyze(sources: Record<string, string>) {
 }
 const page = `import {Component} from '@angular/core'; @Component({}) export class Page {}`;
 
+test('route migration associates exact external and inline templates and exports actionable flow', async () => {
+  const snapshot = input({
+    'routing.ts': `import {Routes} from '@angular/router'; import {Old, New, Missing} from './pages';
+      const routes:Routes=[{path:'admin',children:[{path:'old',component:Old},{path:'new',component:New},{path:'missing',component:Missing}]}];`,
+    'pages.ts': `import {Component} from '@angular/core';
+      @Component({standalone:false,templateUrl:'./unusual.html'}) export class Old {}
+      @Component({standalone:true,template:'<new-button></new-button>'}) export class New {}
+      @Component({standalone:true,templateUrl:'./absent.html'}) export class Missing {}`,
+    'unusual.html': '<old-button></old-button><old-button></old-button>',
+    'unrelated.html': '<old-button></old-button>'
+  });
+  snapshot.migrationRules = [{ id:'button', type:'element', source:'old-button', target:'new-button', enabled:true }];
+  for (const mode of ['routes', 'complete'] as const) {
+    const report = analyzeProject({ ...snapshot, mode })!;
+    const nodes = flattenRoutes(report.routes!.tree);
+    assert.equal(nodes[1]!.migration?.structural, 'Pendente');
+    assert.equal(nodes[1]!.migration?.remaining, 2);
+    assert.ok(nodes[1]!.migration?.actions.some(a => a.includes('old-button → new-button (2)')));
+    assert.equal(nodes[2]!.migration?.structural, 'Standalone');
+    assert.equal(nodes[2]!.migration?.remaining, 0);
+    assert.equal(nodes[3]!.migration?.layout, 'Inconclusivo');
+    assert.equal(nodes[3]!.migration?.remaining, null);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(Buffer.from(await excelReport(report)) as unknown as ExcelJS.Buffer);
+    const sheet = workbook.getWorksheet('Rotas')!;
+    assert.equal(sheet.columnCount, 8);
+    assert.equal(sheet.getCell('B5').value, 'admin → old');
+    assert.equal(sheet.getCell('F5').value, 2);
+    assert.match(String(sheet.getCell('H5').value), /unusual.html/);
+    if (mode === 'complete') assert.match(analysisReportText(report), /Progresso estrutural/);
+  }
+  const withoutRules = analyzeProject({ ...snapshot, migrationRules: [] })!;
+  assert.equal(flattenRoutes(withoutRules.routes!.tree)[2]!.migration?.layout, 'Sem regras');
+});
+
 test('component, arbitrary filename, nested children, empty paths, parameters and reverse relationship', () => {
   const report = analyze({ 'src/config/navigation.ts': `import {Routes as Navigation} from '@angular/router';
     import {Page as Renamed} from '../page';
@@ -171,5 +206,5 @@ test('JSON, output, Excel and worker expose the route report', async () => {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(Buffer.from(await excelReport(report)) as unknown as ExcelJS.Buffer);
   assert.equal(workbook.getWorksheet('Rotas')?.getCell('A4').value, '/**');
-  assert.equal(workbook.getWorksheet('Rotas')?.getCell('C4').value, 'redirect');
+  assert.equal(workbook.getWorksheet('Rotas')?.getCell('C4').value, 'Redirecionamento: (rota vazia)');
 });

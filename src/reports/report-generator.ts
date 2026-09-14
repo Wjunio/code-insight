@@ -3,7 +3,7 @@ import { flattenRoutes } from '../routes/route-types';
 
 export function reportJson(report: ProjectReport | AnalysisReport): string { return JSON.stringify(report, null, 2) + '\n'; }
 export function analysisReportText(report: AnalysisReport): string {
-  if (report.routes) {
+  if (report.routes && report.mode === 'routes') {
     const r = report.routes;
     const depths = new Map<string, number>();
     return ['CODE INSIGHT', `Projeto: ${report.projectName}`, `Analisado em: ${report.analyzedAt}`,

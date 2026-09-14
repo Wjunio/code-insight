@@ -32,7 +32,7 @@ Por exemplo, se o módulo é montado em `/destino` e seu routing contém `path: 
 
 ## Relatório e contagens
 
-O fluxo emite **schemaVersion 4**, `mode: "routes"`, `structural: null`, `ui: null` e a seção `routes`. Os três fluxos anteriores continuam emitindo schema 3, com os mesmos campos e significados. O fluxo Complete continua sendo estrutural + UI; execute Route Analysis separadamente para rotas.
+O fluxo emite **schemaVersion 4**, `mode: "routes"`, `structural: null`, `ui: null` e a seção `routes`. Cada nó inclui `migration`, com situação estrutural, situação de layout, ocorrências pendentes (null quando não determinadas), ações e arquivos. O fluxo Complete também inclui rotas e emite schema 4 quando encontra rotas; os demais relatórios continuam em schema 3.
 
 | Campo | Significado |
 | --- | --- |
@@ -48,7 +48,9 @@ Cada nó contém `path`, `fullPath`, tipo, localização de origem (linha/coluna
 
 Valores dinâmicos ficam como `{ "kind": "unknown", "expression": "..." }`. Um caminho desconhecido usa `null`, inclusive nos caminhos completos dos descendentes; não inventamos URLs. `status: partial` indica limitações identificadas no nó ou em seus filhos. Guards guardam nome, arquivo e, quando lazy, origem do import. `matcher`, `resolve` e `providers` são preservados como dados/expressões sem avaliação.
 
-O Output mostra **ANGULAR ROUTE MAP**, contagens, árvore e localizações. O Excel acrescenta a aba **Rotas** com caminhos, componentes, arquivos, lazy loading, títulos, guards, redirects, pai, localização, status e IDs. O resumo inclui contagens de rotas. JSON mantém a árvore e todos os metadados.
+O Output mostra **ANGULAR ROUTE MAP**, contagens, árvore e localizações. O Excel apresenta oito colunas na aba **Rotas**: Rota / URL, Fluxo de rotas, Tela / destino, Estrutura, Layout, Ocorrências de layout pendentes, O que falta / próxima ação e Onde alterar. O fluxo representa a hierarquia configurada, não uma sequência de cliques. JSON mantém a árvore e todos os metadados técnicos.
+
+A análise cruza cada componente de rota com seu estado standalone e seus templates declarados, inclusive inline e arquivos externos com qualquer nome. As pendências de layout usam as regras de `.code-insight.json`; sem regras ou com templates não resolvidos, não se afirma conclusão. O escopo é o componente e template diretos: componentes internos e folhas CSS não são percorridos. Grupos direcionam para suas rotas filhas; redirects não possuem migração de tela própria. Componentes usados por várias rotas aparecem em cada contexto, portanto não se deve somar linhas como tarefas únicas.
 
 Rotas não medem progresso de migração. Por compatibilidade do envelope, `overallPercentage` vale 0 neste fluxo, mas não deve ser interpretado como percentual; Output não o apresenta e Excel mostra “Não analisado”.
 

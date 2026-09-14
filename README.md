@@ -219,7 +219,7 @@ Progresso geral: 61.6% (ponderado por componentes e ocorrências dos fluxos exec
 
 ## Como interpretar o relatório
 
-Os comandos de migração exportam **schemaVersion 3**, com `mode` (`structural`, `ui` ou `complete`) e duas seções independentes. **Angular Route Analysis** exporta schema 4, `mode: routes` e a seção `routes`; veja [modelo e compatibilidade](docs/ANGULAR-ROUTE-ANALYSIS.md#relatório-e-contagens).
+Os comandos de migração exportam **schemaVersion 3**, com `mode` (`structural`, `ui` ou `complete`) e duas seções independentes. **Angular Route Analysis** e a análise completa quando encontra rotas exportam schema 4, com a seção `routes` e pendências por rota; veja [modelo e compatibilidade](docs/ANGULAR-ROUTE-ANALYSIS.md#relatório-e-contagens).
 
 - `structural`: análise Angular, ou `null` quando não executada. Métricas em `structural.angular`, detalhes em `structural.components` e `structural.modules`, avisos em `structural.warnings`.
 - `ui`: análise de interface, ou `null` quando não executada. Contém `supportedFormats`, `analyzedTemplates`, `totalRules`, `migrationRules`, `totalOccurrences`, `resolvedOccurrences`, `remainingOccurrences`, `progressPercentage`, `files` (métricas por arquivo/regra) e `warnings`.
@@ -349,7 +349,7 @@ O Excel é um `.xlsx` real, gerado com ExcelJS em uma worker. Possui títulos, l
 | Ocorrências | Cada ocorrência e seu status Pendente/Migrado, com arquivo, linha e coluna. |
 | Avisos | Situações que podem tornar o resultado parcial. |
 | Histórico | Execução atual e snapshots anteriores recebidos pelo exportador. |
-| Rotas | Presente no fluxo Angular Route Analysis: árvore expandida com caminhos, componentes, arquivos, guards, redirects e localização. |
+| Rotas | Route Analysis e análise completa com rotas: fluxo, tela, situação de estrutura/layout, quantidade pendente, próxima ação e arquivos para alterar. |
 
 Sem análise estrutural/UI, os indicadores correspondentes mostram “Não executado” ou “Não analisado”; abas detalhadas permanecem com cabeçalhos e explicação. Zero ocorrências é diferente de um fluxo não executado. Não há importação ou persistência automática de histórico nesta fase. O campo opcional `history` do modelo aceita snapshots com projeto, ID, data, fluxo e percentuais; o Excel inclui apenas snapshots do mesmo projeto e a execução atual. Para preservar análises manualmente, salve arquivos com nomes diferentes.
 

@@ -51,14 +51,22 @@ export async function excelReport(report: AnalysisReport): Promise<Uint8Array> {
   const rules = report.ui?.migrationRules ?? [];
   if (report.routes) {
     const nodes = flattenRoutes(report.routes.tree);
-    const byId = new Map(nodes.map(n => [n.id, n]));
-    table(book, 'Rotas', ['Full Path', 'Path', 'Type', 'Component', 'Component File', 'Route File', 'Lazy', 'Title', 'Description', 'Guards', 'Redirect', 'Parent Route', 'Line', 'Column', 'Status', 'Route ID', 'Metadata'],
-      nodes.map(n => [n.fullPath ?? 'unknown', n.path ?? 'unknown', n.type, n.componentName ?? '', n.componentFile ?? '', n.routeFile,
-        n.lazy ? 'Sim' : 'Não', typeof n.title === 'string' ? n.title : JSON.stringify(n.title) ?? '',
-        typeof n.description === 'string' ? n.description : JSON.stringify(n.description) ?? '', JSON.stringify(n.guards),
-        JSON.stringify(n.redirectTo) ?? '', n.parentId ? byId.get(n.parentId)?.fullPath ?? 'unknown' : '', n.sourceLocation.line, n.sourceLocation.column,
-        n.status, n.id, JSON.stringify(n.data) ?? '']),
-      'Mapa estrutural de rotas Angular. Não determina itens de menu. unknown indica valor não resolvido estaticamente.');
+    const flows = new Map<string, string>();
+    table(book, 'Rotas', ['Rota / URL', 'Fluxo de rotas', 'Tela / destino', 'Estrutura', 'Layout', 'Ocorrências de layout pendentes', 'O que falta / próxima ação', 'Onde alterar'],
+      nodes.map(n => {
+        const label = typeof n.title === 'string' ? n.title : n.path === '' ? '(entrada)' : n.path ?? '(não resolvido)';
+        const flow = [n.parentId ? flows.get(n.parentId) : '', label].filter(Boolean).join(' → ');
+        flows.set(n.id, flow);
+        const migration = n.migration;
+        const actions = [...(migration?.actions ?? ['Executar novamente a análise para obter as pendências.'])];
+        if (n.status === 'partial') actions.push('Resolução parcial da rota: revisar a aba Avisos.');
+        return [n.fullPath ?? 'Não resolvida', flow,
+          n.componentName ?? (n.type === 'redirect' ? 'Redirecionamento: ' + (typeof n.redirectTo === 'string' ? n.redirectTo || '(rota vazia)' : 'não resolvido') : n.children.length ? 'Grupo de rotas' : 'Destino não resolvido'),
+          migration?.structural ?? 'Não analisada', migration?.layout ?? 'Não analisado', migration?.remaining ?? 'Não determinado',
+          actions.join('\n') || 'Sem pendências detectadas no componente e template diretos.',
+          [...(migration?.files ?? []), n.routeFile + ':' + n.sourceLocation.line].join('\n')];
+      }),
+      'Escopo: componente e template diretos de cada rota; componentes internos e CSS não incluídos. Fluxo = hierarquia de rotas, não sequência de cliques. Layout depende das regras configuradas.');
   }
   const summary = table(book, 'Resumo', ['Indicador', 'Valor'], [
     ['Projeto', report.projectName], ['Data da análise (UTC)', report.analyzedAt],

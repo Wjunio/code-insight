@@ -1,6 +1,13 @@
 export type RouteNodeType = 'component' | 'lazy-component' | 'children' | 'lazy-routes' | 'redirect' | 'wildcard' | 'unknown';
 export interface RouteReference { name: string; file?: string; source?: string; expression?: string }
 export interface RouteMapNode {
+  migration?: {
+    structural: string;
+    layout: string;
+    remaining: number | null;
+    actions: string[];
+    files: string[];
+  };
   id: string;
   parentId?: string;
   path: string | null;

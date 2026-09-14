@@ -29,7 +29,7 @@ export function registerCommands(context: vscode.ExtensionContext, output: vscod
           progress.report({ message: 'Lendo arquivos do projeto…' });
           const files = await readWorkspace(folder, token);
           if (token.isCancellationRequested) return;
-          const migrationRules = mode === 'structural' || mode === 'routes' ? [] : await readRuleConfiguration(folder);
+          const migrationRules = mode === 'structural' ? [] : await readRuleConfiguration(folder);
           progress.report({ message: `Analisando ${files.length} arquivos…` });
           const report = await runAnalysis(context.asAbsolutePath('dist/src/workers/analysis-worker.js'), {
             projectName: folder.name, projectId: createHash('sha256').update(folder.uri.toString()).digest('hex'), files, migrationRules, mode
