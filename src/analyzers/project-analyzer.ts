@@ -12,7 +12,7 @@ export class AngularProjectAnalyzer implements ProjectAnalyzer {
   analyze(input: AnalysisInput): ProjectReport | null {
     const warnings: string[] = [];
     const detection = detectProject(input.files, warnings);
-    const program = createProgram(input.files);
+    const program = createProgram(input.files, true);
     const checker = program.getTypeChecker();
     const components = new Map<ts.Declaration, ComponentInfo>();
     const templates = new Map<string, Template>();
@@ -34,7 +34,9 @@ export class AngularProjectAnalyzer implements ProjectAnalyzer {
       };
       visit(source);
     }
-    if (!detection.detected && !components.size && !modulesToAnalyze.length) return null;
+    const routerImports = program.getSourceFiles().some(s => s.statements.some(n => ts.isImportDeclaration(n)
+      && ts.isStringLiteral(n.moduleSpecifier) && n.moduleSpecifier.text === '@angular/router'));
+    if (!detection.detected && !components.size && !modulesToAnalyze.length && !routerImports) return null;
     const modules = modulesToAnalyze.map(({ node, call }) => analyzeModule(node, call, checker, components, warnings));
     const list = [...components.values()].sort((a, b) => a.id.localeCompare(b.id));
     const standaloneComponents = list.filter(c => c.standalone === true).length;

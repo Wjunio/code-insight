@@ -45,10 +45,12 @@ test('route migration associates exact external and inline templates and exports
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(Buffer.from(await excelReport(report)) as unknown as ExcelJS.Buffer);
     const sheet = workbook.getWorksheet('Rotas')!;
-    assert.equal(sheet.columnCount, 8);
-    assert.equal(sheet.getCell('B5').value, 'admin → old');
-    assert.equal(sheet.getCell('F5').value, 2);
-    assert.match(String(sheet.getCell('H5').value), /unusual.html/);
+    assert.equal(sheet.columnCount, 9);
+    const row = sheet.getRows(4, sheet.rowCount - 3)!.find(r => r.getCell(1).value === '/admin/old')!;
+    assert.equal(row.getCell(3).value, 'Não');
+    assert.equal(row.getCell(5).value, 2);
+    assert.match(String(row.getCell(7).value), /unusual.html/);
+    assert.equal(row.getCell(9).value, 'Pendente');
     if (mode === 'complete') assert.match(analysisReportText(report), /Progresso estrutural/);
   }
   const withoutRules = analyzeProject({ ...snapshot, migrationRules: [] })!;
@@ -67,7 +69,7 @@ test('component, arbitrary filename, nested children, empty paths, parameters an
   assert.equal(nodes[1]?.componentFile, 'src/page.ts');
   assert.equal(nodes[1]?.componentName, 'Page');
   assert.equal(report.routes!.componentRoutes[0]?.routeIds.length, 4);
-  assert.deepEqual(report.warnings, []);
+  assert.deepEqual(report.routes!.warnings, []);
   assert.equal(new Set(nodes.map(n => n.id)).size, nodes.length);
 });
 
@@ -78,7 +80,7 @@ for (const selection of ['m => m.Page', 'module => module.Page', '({Page}) => Pa
     'barrel/index.ts': `export {Page} from '../page';`, 'page.ts': page });
     assert.equal(report.routes!.tree[0]?.componentFile, 'page.ts');
     assert.equal(report.routes!.tree[0]?.type, 'lazy-component');
-    assert.deepEqual(report.warnings, []);
+    assert.deepEqual(report.routes!.warnings, []);
   });
 }
 
@@ -91,7 +93,7 @@ test('lazy routing imports child routes under each mounting path without duplica
     export const OTHER: Routes = [{path:'',component:Page}, {path:'vendas',component:Page}];`, 'page.ts': page });
   assert.deepEqual(flattenRoutes(report.routes!.tree).map(n => n.fullPath), ['/app', '/app/a', '/app/a', '/app/a/vendas', '/app/b', '/app/b', '/app/b/vendas']);
   assert.equal(report.routes!.tree.length, 1);
-  assert.deepEqual(report.warnings, []);
+  assert.deepEqual(report.routes!.warnings, []);
 });
 
 for (const direct of [false, true]) {
@@ -106,7 +108,7 @@ for (const direct of [false, true]) {
         @NgModule({imports:[RouterModule.forChild(definitions)]}) export class Routing {}`,
       'src/features/page.ts': page });
     assert.deepEqual(flattenRoutes(report.routes!.tree).map(n => n.fullPath), ['/destino', '/destino', '/destino/child']);
-    assert.deepEqual(report.warnings, []);
+    assert.deepEqual(report.routes!.warnings, []);
   });
 }
 
@@ -114,7 +116,7 @@ test('direct import of routing default export follows nested routes', () => {
   const report = analyze({ 'entry.ts': `import {Routes} from '@angular/router'; export const a:Routes=[{path:'x',loadChildren:()=>import('./routing')}];`,
     'routing.ts': `import {Routes} from '@angular/router'; export default [{path:'',children:[{path:'child',redirectTo:'/home'}]}] satisfies Routes;` });
   assert.deepEqual(flattenRoutes(report.routes!.tree).map(n => n.fullPath), ['/x', '/x', '/x/child']);
-  assert.deepEqual(report.warnings, []);
+  assert.deepEqual(report.routes!.warnings, []);
 });
 
 test('guards, data, extensions of menu, redirects and wildcard remain distinct', () => {
@@ -132,7 +134,7 @@ test('guards, data, extensions of menu, redirects and wildcard remain distinct',
   assert.equal(report.routes!.tree[1]?.type, 'redirect');
   assert.equal(report.routes!.tree[1]?.wildcard, true);
   assert.equal(report.routes!.redirectRoutes, 1);
-  assert.deepEqual(report.warnings, []);
+  assert.deepEqual(report.routes!.warnings, []);
 });
 
 test('unresolved configurations, imports, metadata and matcher warn without executing expressions', () => {
@@ -141,10 +143,10 @@ test('unresolved configurations, imports, metadata and matcher warn without exec
     const a:Routes=factory(); const b:Routes=[{path:factory(),data:{title:factory()},matcher:factory,
       loadComponent:()=>import('./absent').then(m=>m.Page)}, {path:'lazy',loadChildren:()=>import('./absent')},
       {path:'spread', ...factory()}];` });
-  assert.ok(report.warnings.some(w => w.includes('configuration detected')));
-  assert.ok(report.warnings.some(w => w.includes('loadComponent')));
-  assert.ok(report.warnings.some(w => w.includes('loadChildren')));
-  assert.ok(report.warnings.some(w => w.includes('matcher')));
+  assert.ok(report.routes!.warnings.some(w => w.includes('configuration detected')));
+  assert.ok(report.routes!.warnings.some(w => w.includes('loadComponent')));
+  assert.ok(report.routes!.warnings.some(w => w.includes('loadChildren')));
+  assert.ok(report.routes!.warnings.some(w => w.includes('matcher')));
   assert.equal(report.routes!.tree[0]?.fullPath, null);
   assert.equal(report.routes!.tree[0]?.componentFile, undefined);
   assert.equal(report.routes!.tree[0]?.status, 'partial');
@@ -154,7 +156,7 @@ test('unresolved configurations, imports, metadata and matcher warn without exec
 test('circular children terminate with a warning', () => {
   const report = analyze({ 'routing.ts': `import {Routes} from '@angular/router'; const a:Routes=[{path:'a',children:b}]; const b:Routes=[{path:'b',children:a}];` });
   assert.equal(report.routes!.totalRoutes, 2);
-  assert.ok(report.warnings.some(w => w.includes('Circular')));
+  assert.ok(report.routes!.warnings.some(w => w.includes('Circular')));
 });
 
 test('local fake Routes and RouterModule are not Angular evidence', () => {
@@ -175,14 +177,14 @@ test('spreads, aliases, multiple disconnected configurations and legacy lazy NgM
       @NgModule({imports:[RouterModule.forChild([{path:'',redirectTo:'child'}])]}) export class Old {}`,
     'extra.ts': `import {Routes} from '@angular/router'; const extra:Routes=[{path:'extra',redirectTo:''}];` });
   assert.deepEqual(flattenRoutes(report.routes!.tree).map(n => n.fullPath), ['/home', '/old', '/old', '/extra']);
-  assert.deepEqual(report.warnings, []);
+  assert.deepEqual(report.routes!.warnings, []);
 });
 
 test('missing named/default exports never guess another route configuration', () => {
   const report = analyze({ 'entry.ts': `import {Routes} from '@angular/router'; const a:Routes=[{path:'x',loadChildren:()=>import('./target')}];`,
     'target.ts': `export const unrelated=[{path:'wrong'}];` });
   assert.equal(report.routes!.totalRoutes, 1);
-  assert.ok(report.warnings.some(w => w.includes('loadChildren')));
+  assert.ok(report.routes!.warnings.some(w => w.includes('loadChildren')));
 });
 
 test('dynamic children inherit unknown full path and all cyclic groups remain visible', () => {
@@ -191,20 +193,20 @@ test('dynamic children inherit unknown full path and all cyclic groups remain vi
     const a:Routes=[{path:'a',children:b}]; const b:Routes=[{path:'b',children:a}];` });
   assert.equal(report.routes!.tree[0]?.children[0]?.fullPath, null);
   assert.ok(flattenRoutes(report.routes!.tree).some(n => n.path === 'a'));
-  assert.ok(report.warnings.some(w => w.includes('Circular')));
+  assert.ok(report.routes!.warnings.some(w => w.includes('Circular')));
 });
 
 test('JSON, output, Excel and worker expose the route report', async () => {
   const snapshot = input({ 'navigation.ts': `import {Routes} from '@angular/router'; const routes:Routes=[{path:'**',redirectTo:''}];` });
   const report = await runAnalysis(resolve('dist/src/workers/analysis-worker.js'), snapshot, new AbortController().signal);
   assert.ok(report?.routes);
-  assert.equal(report.schemaVersion, 4);
-  assert.equal(report.structural, null); assert.equal(report.ui, null);
+  assert.equal(report.schemaVersion, 5);
+  assert.ok(report.structural); assert.ok(report.ui);
   assert.equal(JSON.parse(reportJson(report)).routes.totalRoutes, 1);
   assert.match(analysisReportText(report), /ANGULAR ROUTE MAP/);
-  assert.doesNotMatch(analysisReportText(report), /Progresso geral/);
+  assert.match(analysisReportText(report), /Progresso geral/);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(Buffer.from(await excelReport(report)) as unknown as ExcelJS.Buffer);
   assert.equal(workbook.getWorksheet('Rotas')?.getCell('A4').value, '/**');
-  assert.equal(workbook.getWorksheet('Rotas')?.getCell('C4').value, 'Redirecionamento: (rota vazia)');
+  assert.equal(workbook.getWorksheet('Rotas')?.getCell('B4').value, 'Redirect → (entrada)');
 });

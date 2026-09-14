@@ -14,7 +14,7 @@ const angular = [
 test('UI funciona em HTML puro sem Angular e sem métricas estruturais', () => {
   const report = analyzeProject({ ...base, mode: 'ui', files: [{ path: 'index.html', content: '<input>' }] });
   assert.ok(report); assert.equal(report.structural, null); assert.equal(report.ui?.totalOccurrences, 1);
-  assert.equal(report.schemaVersion, 3); assert.doesNotMatch(analysisReportText(report), /Progresso estrutural/);
+  assert.equal(report.schemaVersion, 5); assert.doesNotMatch(analysisReportText(report), /Progresso estrutural/);
   assert.deepEqual(JSON.parse(reportJson(report)), report);
 });
 test('fluxos estrutural e completo exigem Angular', () => {

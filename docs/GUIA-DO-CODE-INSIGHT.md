@@ -100,7 +100,8 @@ Quando várias regras compartilham o mesmo destino, ele também é atribuído um
 | --- | --- |
 | Somente a estrutura Angular | **Code Insight: Structural Migration (Angular only)** |
 | Somente padrões de interface | **Code Insight: UI Migration (HTML / Angular templates)** |
-| Estrutura e interface do projeto Angular | **Code Insight: Analyze Project — Complete (Angular only)** |
+| Estrutura, interface e pendências por rota Angular | **Code Insight: Analyze Project — Complete (Angular only)** |
+| Auditar cada rota com estrutura e interface correlacionadas | **Code Insight: Angular Route Analysis** |
 
 O fluxo completo exige Angular. A análise de UI pode ser executada sem Angular, mas nesta versão interpreta apenas HTML e templates Angular. React/JSX, Vue e Svelte ainda não têm adaptadores disponíveis.
 
@@ -121,6 +122,9 @@ O Excel é a opção recomendada para leitura e compartilhamento com a equipe. O
 | Aba | Para que serve |
 | --- | --- |
 | **Resumo** | Ver projeto, data, fluxo, principais contagens e percentuais. |
+| **Rotas** | Saber se o componente é Standalone, quantos itens estão pendentes, onde agir e qual é o status final da rota. |
+| **Pendências** | Lista única de trabalho com categoria, regra, origem, destino e posição no arquivo. |
+| **Detalhes Rotas** | Investigar dependências, ocorrências e informações técnicas relacionadas a cada rota. |
 | **Estrutural** | Revisar componentes Angular e módulos encontrados. |
 | **UI Migration** | Ver cada regra, seus totais, migrados, restantes e progresso. |
 | **Arquivos** | Descobrir quais arquivos têm ocorrências de cada regra. |
@@ -129,6 +133,8 @@ O Excel é a opção recomendada para leitura e compartilhamento com a equipe. O
 | **Histórico** | Consultar a execução atual e snapshots fornecidos ao exportador. Ainda não há armazenamento automático de execuções anteriores. |
 
 Os filtros ajudam a encontrar pendências. Os cabeçalhos permanecem visíveis ao rolar a planilha. Fluxos não executados aparecem como **não analisados/não executados**, em vez de apresentar números inventados.
+
+**Standalone = Sim não significa rota concluída.** Ela pode continuar Parcial por dependências ou UI pendente. Rotas não resolvidas ficam Inconclusivas; sem regras de UI, o layout fica Não analisado. Complete e Rotas atualizam todas essas informações juntas: executar Rotas após Complete mantém as abas estruturais/UI preenchidas com dados atuais. Comece por Resumo, filtre Rotas por status e use Pendências para localizar o trabalho. Consulte o [guia da auditoria](AUDITORIA-DE-MIGRACAO.md) para critérios e limites.
 
 O JSON contém os dados estruturados para integrações futuras, dashboards ou processamento automatizado. Ele não exige que a equipe use Excel e não faz integração direta com Power BI.
 

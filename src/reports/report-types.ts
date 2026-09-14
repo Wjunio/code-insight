@@ -10,7 +10,8 @@ export interface AnalysisInput {
   migrationRules?: MigrationRule[];
 }
 export interface AnalysisReport {
-  schemaVersion: 3 | 4;
+  schemaVersion: 3 | 4 | 5;
+  audit?: import('./audit-types').MigrationAudit;
   routes?: import('../routes/route-types').RouteMapReport;
   warnings: string[];
   history?: AnalysisSnapshot[];

@@ -1,6 +1,6 @@
 # Angular Route Analysis
 
-Execute **Code Insight: Angular Route Analysis** na paleta do VS Code. O comando `codeInsight.analyzeRoutes` usa a pasta selecionada, inclui edições não salvas, mostra progresso e permite cancelamento. Não precisa de `.code-insight.json`. Consulte **Output → Code Insight** e use **Code Insight: Export Report** para salvar JSON ou Excel.
+Execute **Code Insight: Angular Route Analysis** na paleta do VS Code. O comando `codeInsight.analyzeRoutes` usa a pasta selecionada, inclui edições não salvas, mostra progresso e permite cancelamento. Ele executa estrutura e UI junto das rotas. `.code-insight.json` é opcional para descobrir rotas, mas suas regras são necessárias para avaliar pendências de layout; configuração inválida interrompe a análise. Consulte **Output → Code Insight** e use **Code Insight: Export Report** para salvar JSON ou Excel.
 
 O analisador lê somente o snapshot: não inicializa Angular, não executa imports, funções, guards, factories ou scripts e não altera o projeto analisado.
 
@@ -32,7 +32,7 @@ Por exemplo, se o módulo é montado em `/destino` e seu routing contém `path: 
 
 ## Relatório e contagens
 
-O fluxo emite **schemaVersion 4**, `mode: "routes"`, `structural: null`, `ui: null` e a seção `routes`. Cada nó inclui `migration`, com situação estrutural, situação de layout, ocorrências pendentes (null quando não determinadas), ações e arquivos. O fluxo Complete também inclui rotas e emite schema 4 quando encontra rotas; os demais relatórios continuam em schema 3.
+O fluxo emite **schemaVersion 5**, `mode: "routes"`, `structural`, `ui`, `routes` e `audit`. Complete também inclui todas essas seções, mesmo com zero rotas. Cada nó mantém os campos técnicos anteriores e acrescenta `audit` com dependências, métricas UI locais, referências a pendências e status final. O campo anterior `migration` é uma projeção da auditoria para compatibilidade. Veja [contrato e migração do schema](AUDITORIA-DE-MIGRACAO.md#json-e-compatibilidade).
 
 | Campo | Significado |
 | --- | --- |
@@ -48,16 +48,16 @@ Cada nó contém `path`, `fullPath`, tipo, localização de origem (linha/coluna
 
 Valores dinâmicos ficam como `{ "kind": "unknown", "expression": "..." }`. Um caminho desconhecido usa `null`, inclusive nos caminhos completos dos descendentes; não inventamos URLs. `status: partial` indica limitações identificadas no nó ou em seus filhos. Guards guardam nome, arquivo e, quando lazy, origem do import. `matcher`, `resolve` e `providers` são preservados como dados/expressões sem avaliação.
 
-O Output mostra **ANGULAR ROUTE MAP**, contagens, árvore e localizações. O Excel apresenta oito colunas na aba **Rotas**: Rota / URL, Fluxo de rotas, Tela / destino, Estrutura, Layout, Ocorrências de layout pendentes, O que falta / próxima ação e Onde alterar. O fluxo representa a hierarquia configurada, não uma sequência de cliques. JSON mantém a árvore e todos os metadados técnicos.
+O Output mostra **ANGULAR ROUTE MAP**, contagens, estado Standalone, status final e ações. O Excel começa por Resumo. Rotas apresenta uma linha por nó: rota, componente/destino, Standalone, estrutura, UI pendente, pendências conhecidas, arquivos afetados, próxima ação e status final. Pendências contém trabalho único; Detalhes Rotas preserva IDs, ocorrências, guards, lazy loading e metadados. JSON mantém a árvore completa.
 
-A análise cruza cada componente de rota com seu estado standalone e seus templates declarados, inclusive inline e arquivos externos com qualquer nome. As pendências de layout usam as regras de `.code-insight.json`; sem regras ou com templates não resolvidos, não se afirma conclusão. O escopo é o componente e template diretos: componentes internos e folhas CSS não são percorridos. Grupos direcionam para suas rotas filhas; redirects não possuem migração de tela própria. Componentes usados por várias rotas aparecem em cada contexto, portanto não se deve somar linhas como tarefas únicas.
+A análise cruza componentes, dependências locais transitivas e templates declarados com as ocorrências globais de UI. Inclui componentes ancestrais e escopos dos NgModules relacionados. Templates compartilhados possuem um item único com múltiplos vínculos explícitos. Grupos resumem filhos, sem duplicar itens no grupo. CSS e código de pacotes externos não são auditados. Consulte [escopo e correlação](AUDITORIA-DE-MIGRACAO.md#escopo-e-correlação).
 
-Rotas não medem progresso de migração. Por compatibilidade do envelope, `overallPercentage` vale 0 neste fluxo, mas não deve ser interpretado como percentual; Output não o apresenta e Excel mostra “Não analisado”.
+O status de cada rota distingue Concluída, Parcial, Pendente, Inconclusiva e Não analisada. Standalone = Sim não implica Concluída. `overallPercentage` usa componentes Standalone e destinos UI encontrados no projeto; não representa a proporção de rotas concluídas, que possui contagens próprias em `audit.routeCounts`.
 
 ## Limites atuais
 
 - Resolve arquivos relativos, extensão `.ts` omitida, imports com `.js`, `index.ts`, aliases de símbolos, barrels e aliases simples `paths`/`baseUrl`. Não consulta node_modules, rede ou arquivos fora do snapshot. Configurações ambíguas não geram caminhos presumidos.
-- A resolução de aliases lê opções locais dos `tsconfig*.json` mais próximos; não interpreta `extends`, referências de projetos ou resolução de pacotes. Os fluxos estrutural/UI mantêm sua resolução anterior.
+- A resolução de aliases lê opções locais dos `tsconfig*.json` mais próximos; não interpreta `extends`, referências de projetos ou resolução de pacotes. Estrutural e auditoria usam a mesma resolução local para correlacionar dependências.
 - Não executa factories, wrappers ou chamadas arbitrárias para produzir rotas. Imports lazy condicionais e callbacks com lógica adicional ficam inconclusivos. Constantes mutadas posteriormente e alterações de rotas em runtime não são reconstruídas.
 - Ciclos interrompem apenas o ramo afetado e geram avisos. A profundidade de expansão é limitada a 200 referências; metadados profundos também ficam inconclusivos.
 - `fullPath` concatena segmentos preservando parâmetros e wildcard; não simula navegação, redirects, matchers ou a sintaxe de URL de outlets auxiliares. O campo `outlet` é preservado separadamente.

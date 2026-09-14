@@ -11,6 +11,10 @@ import { ExcelReportExporter, JsonReportExporter } from '../src/export/report-ex
 import { isInAnalysisScope } from '../src/utils/file-scope';
 
 const defaultRule = { id: 'input', type: 'element', source: 'input', target: 'custom-input' };
+function summaryValue(workbook: ExcelJS.Workbook, label: string) {
+  const sheet = workbook.getWorksheet('Resumo')!;
+  return sheet.getRows(4, sheet.rowCount - 3)!.find(row => row.getCell(1).value === label)?.getCell(2).value;
+}
 test('Excel apresenta status de regra e rejeita texto acima do limite de célula', async () => {
   const report = analyze('<custom-input/>', [defaultRule, { ...defaultRule, id: 'missing', source: 'button', target: 'custom-button' }]);
   const exporter = new ExcelReportExporter(join(__dirname, '../src/workers/excel-worker.js'));
@@ -20,7 +24,7 @@ test('Excel apresenta status de regra e rejeita texto acima do limite de célula
   assert.equal(sheet.getCell('K3').value, 'Status');
   assert.equal(sheet.getCell('K4').value, 'Concluída');
   assert.equal(sheet.getCell('K5').value, 'Pendente');
-  assert.equal(workbook.getWorksheet('Resumo')?.getCell('B24').value, 'Não analisado');
+  assert.equal(summaryValue(workbook, 'Componentes declarados em NgModules'), 'Não analisado');
   report.projectName = 'x'.repeat(32768);
   await assert.rejects(exporter.export(report), /limite de célula/);
   assert.equal(JSON.parse(Buffer.from(await new JsonReportExporter().export(report)).toString()).projectName.length, 32768);
@@ -80,7 +84,7 @@ test('prioridade, especificidade e empate por ID independem da ordem da configur
   const winner = (r: typeof shared) => analyzeRules([{ file: 'a.html', content: '<custom-input/>' }], r).find(x => x.totalOccurrences)?.ruleId;
   assert.equal(winner(shared), 'a'); assert.equal(winner([...shared].reverse()), 'a');
 });
-test('Excel real reabre com sete abas, métricas, filtros, percentuais e strings literais', async () => {
+test('Excel real reabre com dez abas, métricas, filtros, percentuais e strings literais', async () => {
   const report = analyze('<input><custom-input/>');
   report.projectName = '=HYPERLINK("http://example.com")';
   const exporter = new ExcelReportExporter(join(__dirname, '../src/workers/excel-worker.js'));
@@ -91,10 +95,10 @@ test('Excel real reabre com sete abas, métricas, filtros, percentuais e strings
   await writeFile(path, bytes);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await readFile(path) as unknown as ExcelJS.Buffer);
-  assert.deepEqual(workbook.worksheets.map(s => s.name), ['Resumo', 'Estrutural', 'UI Migration', 'Arquivos', 'Ocorrências', 'Avisos', 'Histórico']);
+  assert.deepEqual(workbook.worksheets.map(s => s.name), ['Resumo', 'Rotas', 'Pendências', 'Detalhes Rotas', 'Estrutural', 'UI Migration', 'Arquivos', 'Ocorrências', 'Avisos', 'Histórico']);
   assert.equal(workbook.getWorksheet('Resumo')?.getCell('B4').value, report.projectName);
-  assert.equal(workbook.getWorksheet('Resumo')?.getCell('B7').value, 'Não analisado');
-  assert.equal(workbook.getWorksheet('Resumo')?.getCell('B20').value, 0.5);
+  assert.equal(summaryValue(workbook, 'Progresso estrutural'), 'Não analisado');
+  assert.equal(summaryValue(workbook, 'Progresso UI'), 0.5);
   const sheet = workbook.getWorksheet('UI Migration')!;
   assert.equal(sheet.getCell('F3').value, 'Total'); assert.equal(sheet.getCell('G3').value, 'Migrados');
   assert.equal(sheet.getCell('F4').value, 2); assert.equal(sheet.getCell('G4').value, 1);
@@ -111,7 +115,7 @@ test('Excel aceita UI não analisada e snapshots anteriores sem inventar dados',
   report.history = [{ projectId: 'fixture', analysisId: 'old', analyzedAt: '2026-01-01T00:00:00Z', mode: 'ui', structuralPercentage: null, uiPercentage: 25 }];
   const bytes = await new ExcelReportExporter(join(__dirname, '../src/workers/excel-worker.js')).export(report);
   const workbook = new ExcelJS.Workbook(); await workbook.xlsx.load(Buffer.from(bytes) as unknown as ExcelJS.Buffer);
-  assert.equal(workbook.getWorksheet('Resumo')?.getCell('B20').value, 'Não analisado');
+  assert.equal(summaryValue(workbook, 'Progresso UI'), 'Não analisado');
   assert.equal(workbook.getWorksheet('UI Migration')?.rowCount, 3);
   assert.equal(workbook.getWorksheet('Histórico')?.rowCount, 5);
 });
@@ -128,7 +132,7 @@ test('JSON consolida avisos e Excel preserva declarações de NgModules', async 
   const report = analyzeProject({ mode: 'complete', projectName: 'test', projectId: 'test', files });
   assert.ok(report?.structural);
   assert.ok(report.ui?.warnings.length);
-  assert.deepEqual(report.warnings, [...new Set([...report.structural.warnings, ...report.ui.warnings])]);
+  assert.deepEqual(report.warnings, [...new Set([...report.structural.warnings, ...report.ui.warnings, ...(report.routes?.warnings ?? []), ...(report.audit?.warnings ?? [])])]);
   const json = JSON.parse(Buffer.from(await new JsonReportExporter().export(report)).toString());
   assert.deepEqual(json.warnings, report.warnings);
   const bytes = await new ExcelReportExporter(join(__dirname, '../src/workers/excel-worker.js')).export(report);
@@ -139,5 +143,5 @@ test('JSON consolida avisos e Excel preserva declarações de NgModules', async 
   assert.equal(sheet.getCell('G5').value, report.structural.modules[0]?.declarations.join('\n'));
   assert.equal(sheet.getCell('H5').value, report.structural.modules[0]?.unresolvedDeclarations.join('\n'));
   assert.match(String(sheet.getCell('H5').value), /missing/);
-  assert.equal(workbook.getWorksheet('Resumo')?.getCell('B24').value, 1);
+  assert.equal(summaryValue(workbook, 'Componentes declarados em NgModules'), 1);
 });

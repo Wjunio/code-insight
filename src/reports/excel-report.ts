@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs';
 import type { AnalysisReport } from './report-types';
-import { flattenRoutes } from '../routes/route-types';
+import { auditExcel, statusLabels } from './audit-excel';
 
 type Value = string | number;
 const navy = 'FF17324D';
@@ -39,6 +39,15 @@ function table(book: ExcelJS.Workbook, name: string, headers: string[], rows: Va
     const width = rows.reduce((max, row) => Math.max(max, Math.min(65, String(row[i] ?? '').length)), header.length);
     sheet.getColumn(i + 1).width = Math.max(15, width + 2);
   });
+  sheet.eachRow((row, index) => {
+    if (index <= 3) return;
+    let lines = 1;
+    row.eachCell(cell => {
+      const width = Math.max(12, (sheet.getColumn(Number(cell.col)).width ?? 20) - 2);
+      lines = Math.max(lines, String(cell.value ?? '').split('\n').reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / width)), 0));
+    });
+    row.height = Math.min(120, Math.max(24, lines * 15));
+  });
   sheet.autoFilter = { from: { row: 3, column: 1 }, to: { row: Math.max(3, sheet.rowCount), column: headers.length } };
   sheet.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9, printTitlesRow: '1:3' };
   return sheet;
@@ -49,59 +58,43 @@ export async function excelReport(report: AnalysisReport): Promise<Uint8Array> {
   book.creator = 'Code Insight'; book.created = new Date(report.analyzedAt);
   const a = report.structural?.angular;
   const rules = report.ui?.migrationRules ?? [];
-  if (report.routes) {
-    const nodes = flattenRoutes(report.routes.tree);
-    const flows = new Map<string, string>();
-    table(book, 'Rotas', ['Rota / URL', 'Fluxo de rotas', 'Tela / destino', 'Estrutura', 'Layout', 'Ocorrências de layout pendentes', 'O que falta / próxima ação', 'Onde alterar'],
-      nodes.map(n => {
-        const label = typeof n.title === 'string' ? n.title : n.path === '' ? '(entrada)' : n.path ?? '(não resolvido)';
-        const flow = [n.parentId ? flows.get(n.parentId) : '', label].filter(Boolean).join(' → ');
-        flows.set(n.id, flow);
-        const migration = n.migration;
-        const actions = [...(migration?.actions ?? ['Executar novamente a análise para obter as pendências.'])];
-        if (n.status === 'partial') actions.push('Resolução parcial da rota: revisar a aba Avisos.');
-        return [n.fullPath ?? 'Não resolvida', flow,
-          n.componentName ?? (n.type === 'redirect' ? 'Redirecionamento: ' + (typeof n.redirectTo === 'string' ? n.redirectTo || '(rota vazia)' : 'não resolvido') : n.children.length ? 'Grupo de rotas' : 'Destino não resolvido'),
-          migration?.structural ?? 'Não analisada', migration?.layout ?? 'Não analisado', migration?.remaining ?? 'Não determinado',
-          actions.join('\n') || 'Sem pendências detectadas no componente e template diretos.',
-          [...(migration?.files ?? []), n.routeFile + ':' + n.sourceLocation.line].join('\n')];
-      }),
-      'Escopo: componente e template diretos de cada rota; componentes internos e CSS não incluídos. Fluxo = hierarquia de rotas, não sequência de cliques. Layout depende das regras configuradas.');
-  }
-  const summary = table(book, 'Resumo', ['Indicador', 'Valor'], [
+  const summaryRows: Value[][] = [
     ['Projeto', report.projectName], ['Data da análise (UTC)', report.analyzedAt],
-    ['Fluxo', { routes: 'Angular Route Analysis', complete: 'Completo — Angular', structural: 'Estrutural — Angular', ui: 'UI — HTML / templates Angular' }[report.mode]],
-    ['Progresso estrutural', a ? a.migrationPercentage / 100 : 'Não analisado'],
+    ['Fluxo', { routes: 'Auditoria de rotas + estrutura + UI', complete: 'Completo — Angular', structural: 'Estrutural — Angular', ui: 'UI — HTML / templates Angular' }[report.mode]],
+    ['Status da migração', statusLabels[report.audit?.status ?? 'NOT_ANALYZED']],
+    ['Rotas encontradas', report.routes?.totalRoutes ?? 'Não analisado'],
+    ...Object.entries(statusLabels).map(([status, label]) => [`Rotas — ${label}`, report.audit?.routeCounts?.[status as keyof typeof statusLabels] ?? 'Não analisado'] as Value[]),
+    ['Pendências únicas conhecidas', report.audit ? report.audit.items.filter(i => i.status === 'pending').length : 'Não analisado'],
+    ['Itens inconclusivos para revisão', report.audit ? report.audit.items.filter(i => i.status === 'inconclusive').length : 'Não analisado'],
     ['Componentes encontrados', a?.totalComponents ?? 'Não analisado'],
     ['Standalone', a?.standaloneComponents ?? 'Não analisado'],
     ['Não Standalone', a?.moduleComponents ?? 'Não analisado'],
     ['Inconclusivos', a?.unknownComponents ?? 'Não analisado'],
     ['NgModules encontrados', a?.totalModules ?? 'Não analisado'],
+    ['Componentes declarados em NgModules', a?.declaredModuleComponents ?? 'Não analisado'],
+    ['Progresso estrutural', a ? a.migrationPercentage / 100 : 'Não analisado'],
     ['Templates UI analisados', report.ui?.analyzedTemplates ?? 'Não analisado'],
-    ['Regras UI analisadas', report.ui ? rules.length : 'Não analisado'],
+    ['Regras UI analisadas', report.ui?.totalRules ?? 'Não analisado'],
     ['Ocorrências UI', report.ui?.totalOccurrences ?? 'Não analisado'],
-    ['Avisos', (report.structural?.warnings.length ?? 0) + (report.ui?.warnings.length ?? 0) + (report.routes?.warnings.length ?? 0)],
-    ['ID da análise', report.analysisId], ['ID do projeto', report.projectId], ['Schema JSON', report.schemaVersion],
-    ['Progresso UI', report.ui ? report.ui.progressPercentage / 100 : 'Não analisado'],
-    ['Progresso geral', report.mode === 'routes' ? 'Não analisado' : report.overallPercentage / 100],
     ['UI migradas (destinos encontrados)', report.ui?.resolvedOccurrences ?? 'Não analisado'],
     ['UI restantes', report.ui?.remainingOccurrences ?? 'Não analisado'],
-    ['Componentes declarados em NgModules', a?.declaredModuleComponents ?? 'Não analisado'],
-    ...(report.routes ? [['Rotas encontradas', report.routes.totalRoutes], ['Componentes de rotas resolvidos', report.routes.resolvedComponents], ['Rotas lazy', report.routes.lazyRoutes], ['Redirects', report.routes.redirectRoutes]] as Value[][] : [])
-  ], 'UI é proporção de destinos encontrados, não comprovação histórica. Geral pondera componentes e ocorrências dos fluxos executados.');
-  if (a) {
-    summary.getCell('B7').numFmt = '0.00%';
-    summary.addConditionalFormatting({ ref: 'B7', rules: [{ type: 'dataBar', priority: 1,
+    ['Progresso UI', report.ui?.totalRules ? report.ui.progressPercentage / 100 : 'Não analisado'],
+    ['Progresso geral', report.structural || report.ui ? report.overallPercentage / 100 : 'Não analisado'],
+    ['Avisos', report.warnings.length],
+    ['Escopo da auditoria', report.audit?.scope ?? 'Não analisado']
+  ];
+  const summary = table(book, 'Resumo', ['Indicador', 'Valor'], summaryRows,
+    'Comece pelo status e pelas pendências. UI migrada = destino encontrado. Sem regras de UI, o layout não está avaliado. Totais por rota não devem ser somados; Pendências contém itens únicos.');
+  summary.getColumn(1).width = 40; summary.getColumn(2).width = 85;
+  for (const label of ['Progresso estrutural', 'Progresso UI', 'Progresso geral']) {
+    const row = summaryRows.findIndex(values => values[0] === label) + 4;
+    const cell = summary.getCell(row, 2);
+    if (typeof cell.value !== 'number') continue;
+    cell.numFmt = '0.00%';
+    summary.addConditionalFormatting({ ref: cell.address, rules: [{ type: 'dataBar', priority: row,
       cfvo: [{ type: 'num', value: 0 }, { type: 'num', value: 1 }], ...{ color: { argb: teal } } }] });
   }
-  summary.getCell('B20').numFmt = '0.00%';
-  summary.getCell('B21').numFmt = '0.00%';
-  summary.addConditionalFormatting({ ref: 'B20:B21', rules: [{ type: 'dataBar', priority: 2,
-    cfvo: [{ type: 'num', value: 0 }, { type: 'num', value: 1 }], ...{ color: { argb: teal } } }] });
-  for (const row of [7, 20, 21]) {
-    summary.getRow(row).height = 36;
-    summary.getCell(row, 2).font = { name: 'Calibri', size: 20, bold: true, color: { argb: teal } };
-  }
+  auditExcel(book, report, table);
   const structural = report.structural;
   table(book, 'Estrutural', ['Tipo', 'Nome', 'Arquivo', 'Linha', 'Classificação', 'Módulos / componentes associados', 'Declarações', 'Declarações não resolvidas'], [
     ...(structural?.components.map(c => ['Componente', c.name, c.file, c.line,
@@ -124,7 +117,8 @@ export async function excelReport(report: AnalysisReport): Promise<Uint8Array> {
     rules.flatMap(r => r.matches.map(m => [m.ruleId, m.type, m.attribute ?? '', m.source, m.target, m.file, m.line, m.column, m.status === 'migrated' ? 'Migrado' : 'Pendente'])),
     report.ui ? 'Posições começam em 1 e apontam ao início da tag. Templates inline apontam para o TypeScript original.' : 'Análise UI não executada neste fluxo.');
   table(book, 'Avisos', ['Área', 'Mensagem'], [
-    ...(structural?.warnings.map(w => ['Estrutural', w]) ?? []), ...(report.ui?.warnings.map(w => ['UI', w]) ?? []), ...(report.routes?.warnings.map(w => ['Rotas', w]) ?? [])
+    ...(structural?.warnings.map(w => ['Estrutural', w]) ?? []), ...(report.ui?.warnings.map(w => ['UI', w]) ?? []), ...(report.routes?.warnings.map(w => ['Rotas', w]) ?? []),
+    ...(report.audit?.warnings.map(w => ['Auditoria', w]) ?? [])
   ], 'Avisos podem indicar resultados parciais. A ausência de avisos não elimina as limitações da análise estática.');
   const snapshots = [...(report.history ?? []).filter(s => s.projectId === report.projectId && s.analysisId !== report.analysisId), {
     analysisId: report.analysisId, projectId: report.projectId, analyzedAt: report.analyzedAt, mode: report.mode,

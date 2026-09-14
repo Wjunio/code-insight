@@ -10,12 +10,16 @@ Identifica componentes Standalone, padrões antigos e destinos presentes no cód
 
 | Comando na paleta do VS Code | Quando usar | Resultado |
 | --- | --- | --- |
-| **Code Insight: Angular Route Analysis** | Mapear rotas Angular, componentes e arquivos relacionados. | Árvore de rotas, lazy loading, guards e metadados; exportação JSON/Excel. |
+| **Code Insight: Angular Route Analysis** | Saber o que falta migrar por rota. | Auditoria correlacionada de rotas, estrutura, dependências locais e UI; todas as abas preenchidas com o snapshot atual. |
 | **Code Insight: Structural Migration (Angular only)** | Revisar NgModules e Standalone em Angular. | Somente métricas e avisos estruturais. Não lê regras de UI. |
 | **Code Insight: UI Migration (HTML / Angular templates)** | Procurar padrões de interface, inclusive sem Angular. | Regras e ocorrências em HTML e templates Angular. |
-| **Code Insight: Analyze Project — Complete (Angular only)** | Obter as duas análises para Angular. | Seções estrutural e UI separadas no mesmo relatório. |
+| **Code Insight: Analyze Project — Complete (Angular only)** | Auditar a migração Angular inteira. | Estrutura, UI e rotas correlacionadas, status por rota e lista única de pendências. |
 
 O comando `codeInsight.analyzeProject` executa o fluxo completo. Os fluxos estrutural e completo exigem Angular; quando não o identificam, orientam a usar UI Migration. As exportações Excel e JSON funcionam para o último relatório de qualquer fluxo.
+
+**Para acompanhar a migração:** comece por **Resumo → Rotas → Pendências**. A coluna **Standalone** responde sobre o componente; **Status final** considera também dependências locais, templates e UI. Uma rota pode ter Standalone = Sim e continuar Parcial. **Detalhes Rotas** preserva arquivos, posições, regras, guards e metadados. Veja o [contrato da auditoria e exemplos](docs/AUDITORIA-DE-MIGRACAO.md).
+
+Complete e Route Analysis executam as três análises novamente. Rodar Rotas depois de Complete não esvazia Estrutural/UI nem mistura dados antigos. Complete sem rotas informa **0 rotas analisadas**. Nos fluxos individuais estrutural/UI, rotas ficam **Não analisado**.
 
 **Suporte atual de UI:** arquivos `.html` e templates Angular inline/externos. Todos os HTML dentro do escopo são analisados, mesmo sem referência de um componente. Templates externos compartilhados contam uma vez. O motor de regras é independente de framework, mas os adaptadores JSX/TSX (React), Vue e Svelte ainda não estão implementados. Esses arquivos são sinalizados como não analisados. Folhas CSS e DOM em execução também não são analisados.
 
@@ -56,7 +60,7 @@ O padrão implícito só muda para `true` no Angular 19. Veja a [documentação 
 
 ### Arquivo de configuração UI
 
-Crie `.code-insight.json` na raiz da pasta analisada para os fluxos UI e completo. Nenhuma regra ou destino corporativo é habilitado por padrão. Os destinos abaixo são exemplos: substitua `target` por qualquer destino desejado, sem alterar o código da extensão.
+Crie `.code-insight.json` na raiz da pasta analisada para os fluxos UI, completo e rotas. Nenhuma regra ou destino corporativo é habilitado por padrão. Sem regras habilitadas, a auditoria não declara o layout concluído. Os destinos abaixo são exemplos: substitua `target` por qualquer destino desejado, sem alterar o código da extensão.
 
 ```json
 {
@@ -219,7 +223,7 @@ Progresso geral: 61.6% (ponderado por componentes e ocorrências dos fluxos exec
 
 ## Como interpretar o relatório
 
-Os comandos de migração exportam **schemaVersion 3**, com `mode` (`structural`, `ui` ou `complete`) e duas seções independentes. **Angular Route Analysis** e a análise completa quando encontra rotas exportam schema 4, com a seção `routes` e pendências por rota; veja [modelo e compatibilidade](docs/ANGULAR-ROUTE-ANALYSIS.md#relatório-e-contagens).
+Os quatro comandos exportam **schemaVersion 5**, preservando `structural`, `ui` e a árvore `routes` dos schemas anteriores. `audit.items` reúne os itens únicos e cada nó de rota contém `audit` com referências aos itens, dependências e status final. Complete e Rotas incluem `structural`, `ui` e `routes`, inclusive quando a árvore está vazia. Veja [modelo e compatibilidade](docs/AUDITORIA-DE-MIGRACAO.md#json-e-compatibilidade).
 
 - `structural`: análise Angular, ou `null` quando não executada. Métricas em `structural.angular`, detalhes em `structural.components` e `structural.modules`, avisos em `structural.warnings`.
 - `ui`: análise de interface, ou `null` quando não executada. Contém `supportedFormats`, `analyzedTemplates`, `totalRules`, `migrationRules`, `totalOccurrences`, `resolvedOccurrences`, `remainingOccurrences`, `progressPercentage`, `files` (métricas por arquivo/regra) e `warnings`.
@@ -323,7 +327,7 @@ Uma lista `warnings` vazia não elimina as limitações descritas mais abaixo. J
 
 | Campo no JSON | Significado |
 | --- | --- |
-| `schemaVersion` | `3` nos fluxos de migração; `4` no fluxo de rotas. A seção estrutural preserva internamente o formato `1`. |
+| `schemaVersion` | `5` nos quatro fluxos. A seção estrutural preserva internamente o formato `1`. Exportadores aceitam objetos anteriores 3/4, sem inventar a auditoria ausente. |
 | `analysisId` | Identificador único desta execução. |
 | `projectId` | Identificador derivado da URI da pasta, útil para agrupar execuções na mesma localização. |
 | `projectName` | Nome da pasta selecionada no workspace. |
@@ -343,13 +347,15 @@ O Excel é um `.xlsx` real, gerado com ExcelJS em uma worker. Possui títulos, l
 | Aba | Conteúdo |
 | --- | --- |
 | Resumo | Projeto, data, fluxo, contagens e indicadores estrutural/UI/geral. |
+| Rotas | Uma linha por nó: componente, Standalone, estrutura, UI pendente, arquivos, próxima ação e status final. |
+| Pendências | Uma linha por item único, com rotas relacionadas, categoria, regra, origem, destino, arquivo, linha, coluna e ação. Inclui itens globais sem rota determinada. |
+| Detalhes Rotas | Relação completa por ID de rota, componente, ocorrências e informações técnicas de routing. |
 | Estrutural | Componentes e módulos Angular identificados, classificação, associações, declarações e declarações não resolvidas. |
 | UI Migration | Regra, tipo, origem, destino, total, migrados, restantes, progresso, arquivos afetados e status (Concluída/Pendente). |
 | Arquivos | Uma linha por arquivo e regra, com métricas de migração. |
 | Ocorrências | Cada ocorrência e seu status Pendente/Migrado, com arquivo, linha e coluna. |
 | Avisos | Situações que podem tornar o resultado parcial. |
 | Histórico | Execução atual e snapshots anteriores recebidos pelo exportador. |
-| Rotas | Route Analysis e análise completa com rotas: fluxo, tela, situação de estrutura/layout, quantidade pendente, próxima ação e arquivos para alterar. |
 
 Sem análise estrutural/UI, os indicadores correspondentes mostram “Não executado” ou “Não analisado”; abas detalhadas permanecem com cabeçalhos e explicação. Zero ocorrências é diferente de um fluxo não executado. Não há importação ou persistência automática de histórico nesta fase. O campo opcional `history` do modelo aceita snapshots com projeto, ID, data, fluxo e percentuais; o Excel inclui apenas snapshots do mesmo projeto e a execução atual. Para preservar análises manualmente, salve arquivos com nomes diferentes.
 
@@ -402,7 +408,7 @@ test/                Cenários isolados com node:test
 
 A API do compilador TypeScript fornece AST e símbolos; ExcelJS gera XLSX reais com formatação, recurso ausente nas APIs nativas de Node/VS Code. Node fornece workers, testes e JSON; VS Code fornece busca, leitura, progresso e exportação. ESLint, tipos e `@vscode/vsce` são ferramentas de desenvolvimento. O override de `uuid` do ExcelJS usa a versão 11 com correção de segurança e API CommonJS `v4` compatível, validada pela geração e reabertura de planilhas com formatação condicional.
 
-As métricas são calculadas no analisador e em `migration-metrics.ts`, não no Excel. `ReportExporter` recebe o relatório e retorna bytes; o comando cuida da escolha de destino e gravação pela API VS Code. O Excel apenas apresenta os campos do relatório, sem inspecionar código Angular ou aplicar regras.
+As métricas são calculadas no analisador e em `migration-metrics.ts`, não no Excel. `migration-audit.ts` correlaciona componentes, imports locais, templates e ocorrências já produzidas pela UI; calcula os status e as referências a itens únicos. `route-migration.ts` mantém os campos antigos como uma projeção dessa auditoria, sem executar regras novamente. `ReportExporter` recebe o relatório e retorna bytes; o comando cuida da escolha de destino e gravação pela API VS Code. O Excel apenas apresenta os campos do relatório, sem inspecionar código Angular ou aplicar regras.
 
 `RuleEngine` coordena matchers por tipo sem depender de Angular ou HTML. Os quatro matchers atuais compartilham o scanner de templates, executado uma vez por template. Para um novo tipo, estenda os tipos/validação e registre um `RuleMatcher`; o analisador Angular e a agregação dos resultados permanecem os mesmos. Novos domínios, como imports TypeScript, podem ampliar `RuleContext` e fornecer seu próprio parser. Configurações são dados: não executam plugins ou código do usuário.
 
@@ -411,7 +417,7 @@ Leitura em lotes de 16 arquivos; análise em worker thread. Cancelar encerra a w
 ## Limitações
 
 - Exclui `node_modules`, `dist`, `out`, `build`, `coverage`, `.git`, `.vscode`, `.angular`, `.code-insight`, `.d.ts`, `.spec.ts` e `.test.ts`. Analisa a pasta, não o grafo de um tsconfig. A política de exclusão está isolada para configuração futura.
-- Os fluxos estrutural/UI não resolvem `paths` de tsconfig; o fluxo de rotas suporta aliases simples conforme seu guia. Não resolve wrappers/reexports de decorators, chamadas arbitrárias ou templates calculados. Casos dinâmicos reconhecidos geram avisos; decorators ocultos por wrappers podem não ser detectados.
+- Estrutural, rotas e auditoria resolvem aliases locais simples de `paths`/`baseUrl`. Não resolvem wrappers/reexports de decorators, chamadas arbitrárias ou templates calculados. Imports locais transitivos são auditados; imports não resolvidos ficam inconclusivos. O escopo de um NgModule inclui suas declarações/exports, sem inferir quais seletores são usados em runtime. CSS, serviços, directives, pipes e pacotes externos não têm auditoria de migração completa.
 - Versão vem do `package.json` mais próximo que declara `@angular/core`. Versões simples, `^` e `~` com major conhecido são aceitas; intervalos amplos/tags são inconclusivos. Não consulta lockfile/instalação efetiva: verifique a correspondência com a versão usada pelo projeto.
 - Scanner HTML é lexical, não o compilador Angular. Sintaxe malformada/construções dinâmicas complexas podem gerar contagens incompletas.
 - Erros sintáticos, declarações não resolvidas e templates ausentes geram avisos. A análise não prova que o projeto compila ou que a migração está correta.

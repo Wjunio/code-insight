@@ -1,6 +1,7 @@
 export type RouteNodeType = 'component' | 'lazy-component' | 'children' | 'lazy-routes' | 'redirect' | 'wildcard' | 'unknown';
 export interface RouteReference { name: string; file?: string; source?: string; expression?: string }
 export interface RouteMapNode {
+  audit?: import('../reports/audit-types').RouteAudit;
   migration?: {
     structural: string;
     layout: string;

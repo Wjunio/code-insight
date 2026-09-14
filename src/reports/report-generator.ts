@@ -1,25 +1,11 @@
 import type { AnalysisReport, ProjectReport } from './report-types';
 import { flattenRoutes } from '../routes/route-types';
+import { statusLabels } from './audit-excel';
 
 export function reportJson(report: ProjectReport | AnalysisReport): string { return JSON.stringify(report, null, 2) + '\n'; }
 export function analysisReportText(report: AnalysisReport): string {
-  if (report.routes && report.mode === 'routes') {
-    const r = report.routes;
-    const depths = new Map<string, number>();
-    return ['CODE INSIGHT', `Projeto: ${report.projectName}`, `Analisado em: ${report.analyzedAt}`,
-      'Fluxo: Angular Route Analysis', '', 'ANGULAR ROUTE MAP',
-      `Routes found: ${r.totalRoutes}`, `Components resolved: ${r.resolvedComponents}`,
-      `Lazy routes: ${r.lazyRoutes}`, `Redirects: ${r.redirectRoutes}`, `Warnings: ${r.warnings.length}`, '',
-      ...flattenRoutes(r.tree).map(n => {
-        const depth = n.parentId ? (depths.get(n.parentId) ?? 0) + 1 : 0;
-        depths.set(n.id, depth);
-        return `${'  '.repeat(depth)}${n.path === '' ? '(empty)' : n.path ?? '(unknown)'} [${n.type}] ${n.fullPath ?? 'unknown'}\n${'  '.repeat(depth + 1)}${n.routeFile}:${n.sourceLocation.line}:${n.sourceLocation.column}${n.componentName ? ` → ${n.componentName} (${n.componentFile ?? 'unknown'})` : ''}${n.type === 'redirect' ? ` → ${JSON.stringify(n.redirectTo)}` : ''}`;
-      }), ...r.warnings.map(w => `Aviso de rotas: ${w}`), '',
-      'Route Map representa rotas, não um menu de navegação.',
-      'Exporte com Code Insight: Export Report (Excel ou JSON).'].join('\n');
-  }
   const lines = ['CODE INSIGHT', `Projeto: ${report.projectName}`, `Analisado em: ${report.analyzedAt}`,
-    `Fluxo: ${report.mode === 'complete' ? 'Análise completa — exclusivo Angular' : report.mode === 'structural' ? 'Structural Migration — exclusivo Angular' : 'UI Migration — HTML e templates Angular'}`, ''];
+    `Fluxo: ${report.mode === 'routes' ? 'Auditoria de rotas — Angular' : report.mode === 'complete' ? 'Análise completa — exclusivo Angular' : report.mode === 'structural' ? 'Structural Migration — exclusivo Angular' : 'UI Migration — HTML e templates Angular'}`, ''];
   if (report.structural) {
     const structural = report.structural;
     const a = structural.angular;
@@ -43,6 +29,18 @@ export function analysisReportText(report: AnalysisReport): string {
     `Total de ocorrências de regras: ${report.ui.totalOccurrences}`,
     `Progresso UI: ${report.ui.progressPercentage}% (destinos encontrados / total; não é comprovação histórica).`,
     ...report.ui.warnings.map(w => `Aviso de UI: ${w}`), '');
+  if (report.routes) {
+    lines.push('ANGULAR ROUTE MAP — MIGRAÇÃO', 'Rotas: ' + report.routes.totalRoutes);
+    for (const [status, count] of Object.entries(report.audit?.routeCounts ?? {})) lines.push(status + ': ' + count);
+    for (const node of flattenRoutes(report.routes.tree)) {
+      const a = node.audit;
+      lines.push((node.fullPath ?? 'Não resolvida') + ' | ' + (node.componentName ?? node.type)
+        + ' | Standalone: ' + (a?.standalone === true ? 'Sim' : a?.standalone === false ? 'Não' : 'Não determinado')
+        + ' | ' + statusLabels[a?.finalStatus ?? 'NOT_ANALYZED'] + ' | Pendências: ' + (a?.pendingItemIds.length ?? 'Não analisado'));
+      lines.push(...(a?.nextActions ?? []).map(action => '  ' + action));
+    }
+    lines.push(...report.routes.warnings.map(w => 'Aviso de rotas: ' + w));
+  }
   lines.push(`Progresso geral: ${report.overallPercentage}% (ponderado por componentes e ocorrências dos fluxos executados).`,
     'Exporte com Code Insight: Export Report (Excel recomendado ou JSON).');
   return lines.join('\n');
